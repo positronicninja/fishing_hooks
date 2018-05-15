@@ -1,0 +1,44 @@
+#!/bin/bash --login
+
+# What is this?
+# =============
+# This is a modular pre-commit script that will execute the hooks linked in the pre-commit-enabled directory. It is
+# inspired by this project: https://github.com/datagrok/modular-git-hooks && https://gist.github.com/timuruski/ed20354fae75b3abb0d1bf6b1353c842
+#
+# Code for the while loop is based on samples from: https://github.com/koalaman/shellcheck/wiki/SC2044
+
+set -e
+
+NC="\\033[0m"
+GREEN="\\033[0;32m"
+
+REPO="$(git rev-parse --show-toplevel)"
+AVAILABLE="$REPO/scripts/git-hooks/pre-commit-available"
+ENABLED="$REPO/scripts/git-hooks/pre-commit-enabled"
+HOOKS="$REPO/.git/hooks"
+
+if [[ -d $ENABLED ]]; then
+  rm -rf "${ENABLED:?}/"*
+else
+  mkdir -p "$ENABLED"
+fi
+
+while IFS= read -r -d '' script
+do
+  basename="$(basename "$script")"
+  ln -s "../pre-commit-available/$basename" "$ENABLED/$basename"
+done < <(find "$AVAILABLE" -type f -name '*.sh' -print0)
+
+
+if [[ -f $(find "$HOOKS" -type l -name 'pre-commit' -print0) ]]; then
+  rm "$HOOKS/pre-commit"
+elif [[ -f $(find "$HOOKS" -type f -name 'pre-commit' -print0) ]]; then
+  mv "$HOOKS/pre-commit" "$HOOKS/pre-commit-previous"
+fi
+
+if [[ ! -L $(find "$HOOKS" -type l -name 'pre-commit' -print0) ]]; then
+  ln -s ../../scripts/git_hooks/pre-commit-sh "$HOOKS/pre-commit"
+fi
+
+echo -e "[Pre-Commit]${GREEN}[Info]${NC}: Installed the following pre-commit hooks:"
+ls "$ENABLED"
